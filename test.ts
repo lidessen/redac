@@ -1,10 +1,15 @@
-import { redac } from "./mod.ts"
+import { collect, redac, watch } from "./mod.ts";
 
-let a = 0
-let b = 0
+const count = redac(0);
+const state = redac({
+  count: 0,
+});
 
-const fa = () => a++
-const fb = (n: number) => a+=b
+setInterval(() => count.current++, 100);
+setInterval(() => state.count++, 1000);
 
-const [mfa, $a] = redac(fa, () => a)
-const [mfb, $b] = redac(fb, () => b)
+const { select } = collect(count, state);
+
+const db = select(() => state.count + count.current);
+
+watch(db, console.log);

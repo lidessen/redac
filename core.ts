@@ -30,7 +30,7 @@ type RedacObject<
     | Map<unknown, unknown>
     | WeakSet<object>
     | WeakMap<object, unknown>
-> = T & Observable<T>;
+> = T & T extends Ref<infer P> ? Observable<P> : Observable<T>;
 
 type RedacFunc<T extends Function> = T & Observable<ReturnType<T>>;
 type RedacAsyncFunc<T, P extends AsyncFunction<T>> = P & Observable<T>;
@@ -229,7 +229,7 @@ function redacObject<T extends CommonObject>(
       }
       return true;
     },
-  }) as RedacObject<T>;
+  }) as unknown as RedacObject<T>;
 }
 
 function redacValue<T extends string | number | bigint | undefined | null>(
@@ -293,5 +293,5 @@ function redacAsyncFunc<T extends AsyncFunction>(val: T) {
 // function redacFunc<T extends Function>() {}
 
 export function watch<T>(r: Observable<T>, fn: Callback<T>) {
-  r[SUB](fn);
+  return r[SUB](fn);
 }

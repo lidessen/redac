@@ -2,7 +2,7 @@ import { redac, watch } from "./core.ts";
 import { TYPE } from "./symbol.ts";
 import { useSyncExternalStore } from "https://esm.sh/use-sync-external-store@1.2.0/shim";
 
-export function useRedac<T>(data: T) {
+export function useRedac<T>(data: T): T {
   const r = redac(data);
   const subscribe = (fn: () => void) => {
     return watch(r, fn);

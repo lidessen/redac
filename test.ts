@@ -1,4 +1,4 @@
-import { collect, redac, watch } from "./mod.ts";
+import { collect, redac, watch } from "./core.ts";
 
 const count = redac(0);
 const state = redac({

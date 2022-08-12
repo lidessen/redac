@@ -1,5 +1,7 @@
 import { equal } from "./equal.ts";
 import { Subscription } from "./subscription.ts";
+import { SUB, TRIGGER, TYPE } from "./symbol.ts";
+import { isValueType } from "./type.ts";
 
 type Getter<T> = () => T;
 type Callback<T> = (val: T) => void;
@@ -29,10 +31,6 @@ interface Subscriber<T> {
   selector: Selecter<T>;
 }
 
-const SUB = Symbol("sub");
-const TRIGGER = Symbol("trigger");
-const TYPE = Symbol("type");
-
 function redacGetter<T>(getter: Getter<T>): RedacValue<T> {
   const listeners = new Set<Callback<T>>();
 
@@ -53,7 +51,7 @@ function redacGetter<T>(getter: Getter<T>): RedacValue<T> {
   };
 }
 
-export function proxy<T>(r: RedacValue<T>, fn: Function) {
+export function proxy<T>(r: Observable<T>, fn: Function) {
   if (typeof fn === "function") {
     return new Proxy(fn, {
       apply: (target, thisArg, args) => {
@@ -180,15 +178,6 @@ function redacValue<T extends string | number | bigint | undefined | null>(
 }
 
 // function redacFunc<T extends Function>() {}
-
-function isValueType(
-  obj: unknown
-): obj is string | number | bigint | undefined | null {
-  return (
-    ["bigint", "boolean", "number", "string"].includes(typeof obj) ||
-    obj === null
-  );
-}
 
 export function watch<T>(r: Observable<T>, fn: Callback<T>) {
   r[SUB](fn);

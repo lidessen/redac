@@ -1,5 +1,6 @@
 // deno-lint-ignore-file ban-types
 import { equal } from "./equal.ts";
+import { getProp } from "./helper.ts";
 import { Subscription } from "./subscription.ts";
 import { SUB, TRIGGER, TYPE } from "./symbol.ts";
 import { isValueType, type Function, isFunc, AsyncFunction } from "./type.ts";
@@ -110,6 +111,8 @@ export function collect<T extends Observable<unknown>[]>(...rvals: T) {
       current: selector(),
       selector,
     });
+
+    return listeners.delete(fn as Callback<unknown>);
   };
 
   const select = <T>(selector: Selecter<T>): RedacValue<T> => {
@@ -126,6 +129,7 @@ export function collect<T extends Observable<unknown>[]>(...rvals: T) {
 
   return {
     select,
+    watch,
     cleanup,
   };
 }
@@ -216,9 +220,7 @@ function redacObject<T extends CommonObject>(
           };
         }
       }
-      return typeof target[p] === "function"
-        ? (target[p] as Function).bind(target)
-        : target[p];
+      return getProp(target, p);
     },
     set(target, p, value) {
       target[p as keyof typeof target] = value;
@@ -254,7 +256,7 @@ function redacFunc<T extends Function>(val: T) {
       if (p === TRIGGER) {
         return trigger;
       }
-      return target[p as keyof typeof target];
+      return getProp(target, p);
     },
     apply: (target, thisArg, args) => {
       const res = Reflect.apply(target, thisArg, args);
@@ -278,7 +280,7 @@ function redacAsyncFunc<T extends AsyncFunction>(val: T) {
       if (p === TRIGGER) {
         return trigger;
       }
-      return target[p as keyof typeof target];
+      return getProp(target, p);
     },
     apply: (target, thisArg, args) => {
       const res = Reflect.apply(target, thisArg, args);

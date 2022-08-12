@@ -1,13 +1,13 @@
+// deno-lint-ignore-file ban-types
 import { equal } from "./equal.ts";
 import { Subscription } from "./subscription.ts";
 import { SUB, TRIGGER, TYPE } from "./symbol.ts";
-import { isValueType } from "./type.ts";
+import { isValueType, type Function, isFunc, AsyncFunction } from "./type.ts";
 
 type Getter<T> = () => T;
 type Callback<T> = (val: T) => void;
 type Selecter<T> = () => T;
 type CommonObject = Record<string | symbol | number, unknown>;
-type Function = (...args: unknown[]) => unknown;
 
 interface Observable<T> {
   [SUB](fn: (val: T) => void): () => void;
@@ -20,7 +20,19 @@ interface RedacValue<T> extends Observable<T> {
   [TRIGGER](): void;
 }
 
-type RedacObject<T extends CommonObject | Ref<unknown>> = T & Observable<T>;
+type RedacObject<
+  T extends
+    | CommonObject
+    | Ref<unknown>
+    | unknown[]
+    | Set<unknown>
+    | Map<unknown, unknown>
+    | WeakSet<object>
+    | WeakMap<object, unknown>
+> = T & Observable<T>;
+
+type RedacFunc<T extends Function> = T & Observable<ReturnType<T>>;
+type RedacAsyncFunc<T, P extends AsyncFunction<T>> = P & Observable<T>;
 
 interface Ref<T> {
   current: T;
@@ -118,7 +130,16 @@ export function collect<T extends Observable<unknown>[]>(...rvals: T) {
   };
 }
 
-export function redac<T extends CommonObject>(val: T): RedacObject<T>;
+export function redac<T extends Function>(val: T): RedacFunc<T>;
+export function redac<
+  T extends
+    | CommonObject
+    | unknown[]
+    | Set<unknown>
+    | Map<unknown, unknown>
+    | WeakSet<object>
+    | WeakMap<object, unknown>
+>(val: T): RedacObject<T>;
 export function redac<T>(val: T): RedacObject<Ref<T>>;
 export function redac<T extends unknown>(val: T): T;
 export function redac<T>(obj: T) {
@@ -128,9 +149,13 @@ export function redac<T>(obj: T) {
   if (typeof obj === "object") {
     return redacObject(obj as CommonObject);
   }
-  if (typeof obj === "function") {
-    return obj;
+  if (isFunc(obj)) {
+    return redacFunc(obj);
   }
+}
+
+export function redacAsync<T, P extends AsyncFunction<T>>(val: P) {
+  return redacAsyncFunc(val) as RedacAsyncFunc<T, P>;
 }
 
 function redacObject<T extends CommonObject>(
@@ -155,7 +180,45 @@ function redacObject<T extends CommonObject>(
           trigger(target);
         };
       }
-      return target[p];
+      if (target instanceof Set) {
+        if (p === "add" || p === "delete" || p === "clear") {
+          return (...args: unknown[]) => {
+            const res = Reflect.apply(target[p], target, args);
+            trigger(target);
+            return res;
+          };
+        }
+      }
+      if (target instanceof WeakSet) {
+        if (p === "add" || p === "delete") {
+          return (...args: unknown[]) => {
+            const res = Reflect.apply(target[p], target, args);
+            trigger(target);
+            return res;
+          };
+        }
+      }
+      if (target instanceof Map) {
+        if (p === "set" || p === "get" || p === "clear" || p === "delete") {
+          return (...args: unknown[]) => {
+            const res = Reflect.apply(target[p], target, args);
+            trigger(target);
+            return res;
+          };
+        }
+      }
+      if (target instanceof WeakMap) {
+        if (p === "set" || p === "get" || p === "delete") {
+          return (...args: unknown[]) => {
+            const res = Reflect.apply(target[p], target, args);
+            trigger(target);
+            return res;
+          };
+        }
+      }
+      return typeof target[p] === "function"
+        ? (target[p] as Function).bind(target)
+        : target[p];
     },
     set(target, p, value) {
       target[p as keyof typeof target] = value;
@@ -175,6 +238,54 @@ function redacValue<T extends string | number | bigint | undefined | null>(
     [TYPE]: "ref",
   };
   return redacObject(obj);
+}
+
+function redacFunc<T extends Function>(val: T) {
+  const listeners = new Set<Callback<unknown>>();
+  const trigger = (val?: unknown) => listeners.forEach((fn) => fn(val));
+  return new Proxy(val, {
+    get(target, p) {
+      if (p === SUB) {
+        return (fn: Callback<unknown>) => {
+          listeners.add(fn);
+          return () => listeners.delete(fn);
+        };
+      }
+      if (p === TRIGGER) {
+        return trigger;
+      }
+      return target[p as keyof typeof target];
+    },
+    apply: (target, thisArg, args) => {
+      const res = Reflect.apply(target, thisArg, args);
+      trigger(res);
+      return res;
+    },
+  }) as RedacFunc<T>;
+}
+
+function redacAsyncFunc<T extends AsyncFunction>(val: T) {
+  const listeners = new Set<Callback<unknown>>();
+  const trigger = (val?: unknown) => listeners.forEach((fn) => fn(val));
+  return new Proxy(val, {
+    get(target, p) {
+      if (p === SUB) {
+        return (fn: Callback<unknown>) => {
+          listeners.add(fn);
+          return () => listeners.delete(fn);
+        };
+      }
+      if (p === TRIGGER) {
+        return trigger;
+      }
+      return target[p as keyof typeof target];
+    },
+    apply: (target, thisArg, args) => {
+      const res = Reflect.apply(target, thisArg, args);
+      res.then(trigger);
+      return res;
+    },
+  }) as RedacFunc<T>;
 }
 
 // function redacFunc<T extends Function>() {}

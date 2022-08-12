@@ -6,3 +6,10 @@ export function isValueType(
     obj === null
   );
 }
+
+export type Function = (...args: unknown[]) => unknown;
+export type AsyncFunction<T = unknown> = (...args: unknown[]) => Promise<T>;
+
+export function isFunc(obj: unknown): obj is Function {
+  return typeof obj === "function";
+}

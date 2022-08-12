@@ -1,15 +1,35 @@
-import { collect, redac, watch } from "./core.ts";
+import { collect, redac, redacAsync, watch } from "./core.ts";
 
 const count = redac(0);
-const state = redac({
-  count: 0,
+const state = redac<number[]>([]);
+const set = redac(new Set<number>());
+
+const trigger = redac(() => {
+  console.log("trigger");
+  return new Promise((resolve) => {
+    setTimeout(() => resolve(count.current), 1000);
+  });
+});
+
+const asyncTrigger = redacAsync(() => {
+  console.log("async trigger");
+  return new Promise((resolve) => {
+    setTimeout(() => resolve(count.current), 300);
+  });
 });
 
 setInterval(() => count.current++, 100);
-setInterval(() => state.count++, 1000);
+setInterval(() => state.push(count.current), 1000);
+// setInterval(asyncTrigger, 3000);
+setInterval(() => set.add(count.current), 3000);
 
-const { select } = collect(count, state);
+const { select } = collect(count, state, trigger);
 
-const db = select(() => state.count + count.current);
+const computed = select(() => state[state.length - 1] + count.current);
 
-watch(db, console.log);
+// watch(computed, console.log);
+watch(asyncTrigger, (val) => {
+  console.log("trigger value", val);
+});
+
+watch(set, (val) => console.log("set", val));

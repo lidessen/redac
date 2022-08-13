@@ -1,8 +1,4 @@
-import {
-  inc,
-  type ReleaseType,
-  type Options,
-} from "https://deno.land/std@0.152.0/semver/mod.ts";
+import { inc, type ReleaseType, type Options } from "semver/mod.ts";
 import { VERSION } from "../version.ts";
 
 const newVer = inc(

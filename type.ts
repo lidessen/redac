@@ -2,8 +2,9 @@ export function isValueType(
   obj: unknown
 ): obj is string | number | bigint | undefined | null {
   return (
-    ["bigint", "boolean", "number", "string"].includes(typeof obj) ||
-    obj === null
+    ["bigint", "boolean", "number", "string", "undefined"].includes(
+      typeof obj
+    ) || obj === null
   );
 }
 

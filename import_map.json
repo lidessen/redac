@@ -1,0 +1,9 @@
+{
+  "imports": {
+    "async/": "https://deno.land/std@0.152.0/async/",
+    "semver/": "https://deno.land/std@0.152.0/semver/",
+    "testing/": "https://deno.land/std@0.152.0/testing/",
+    "dnt/": "https://deno.land/x/dnt@0.30.0/"
+  },
+  "scopes": {}
+}

@@ -1,10 +1,14 @@
 {
     "tasks": {
+        "npm:add": "deno run -A https://esm.sh/v91 add",
+        "npm:update": "deno run -A https://esm.sh/v91 update",
+        "npm:remove": "deno run -A https://esm.sh/v91 remove",
         "build:npm": "deno run -A scripts/build_npm.ts",
         "ver:major": "deno run -A scripts/version.ts major",
         "ver:minor": "deno run -A scripts/version.ts minor",
         "ver:patch": "deno run -A scripts/version.ts patch",
         "ver:aplha": "deno run -A scripts/version.ts pre aplha",
         "ver:beta": "deno run -A scripts/version.ts pre beta"
-    }
+    },
+    "importMap": "import_map.json"
 }

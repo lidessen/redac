@@ -37,7 +37,7 @@ export interface Observable<T> {
 }
 
 interface RedacValue<T> extends Observable<T> {
-  get current(): T;
+  current: T;
 }
 
 export type RedacObject<T extends CommonObjects> = T &

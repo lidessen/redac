@@ -3,7 +3,7 @@ import { SubscribeIterator, ManualIterator, interval } from "./iter.ts";
 const _interval = interval(1000);
 
 const sub_iter = new SubscribeIterator(_interval.subscribe, _interval.dispose);
-const manual_iter = new ManualIterator<Date>();
+const manual_iter = new ManualIterator<number>();
 
 let i = 0;
 
@@ -12,7 +12,7 @@ _interval.subscribe(() => {
   if (i > 10) {
     // return _interval.dispose();
   }
-  manual_iter.next(new Date());
+  manual_iter.next(i);
 });
 
 (async function () {

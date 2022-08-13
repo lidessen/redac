@@ -9,8 +9,12 @@ await build({
   shims: {
     deno: true,
   },
+  importMap: "./import_map.json",
   packageManager: "pnpm",
   test: false,
+  compilerOptions: {
+    lib: ["dom", "esnext"],
+  },
   package: {
     name: "redac",
     version: VERSION,
@@ -28,10 +32,10 @@ await build({
     },
   },
   mappings: {
-    "https://esm.sh/use-sync-external-store@1.2.0/shim": {
+    "https://esm.sh/use-sync-external-store@1.2.0/shim/with-selector": {
       name: "use-sync-external-store",
       version: "^1.2.0",
-      subPath: "shim",
+      subPath: "shim/with-selector",
       peerDependency: true,
     },
   },

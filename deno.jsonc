@@ -1,4 +1,11 @@
 {
+    "compilerOptions": {
+        "lib": [
+            "deno.window",
+            "es2021",
+            "dom"
+        ]
+    },
     "tasks": {
         "npm:add": "deno run -A https://esm.sh/v91 add",
         "npm:update": "deno run -A https://esm.sh/v91 update",

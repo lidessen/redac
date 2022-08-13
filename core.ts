@@ -1,39 +1,50 @@
 // deno-lint-ignore-file ban-types
-import { equal } from "./equal.ts";
+import { equal as _equal } from "./equal.ts";
 import { getProp } from "./helper.ts";
 import { Subscription } from "./subscription.ts";
-import { SUB, TRIGGER, TYPE } from "./symbol.ts";
+import { CLONE, SUB, TRIGGER, TYPE, ORIGINAL } from "./symbol.ts";
 import { isValueType, type Function, isFunc, AsyncFunction } from "./type.ts";
+import { clone as _clone } from "./clone.ts";
 
 type Getter<T> = () => T;
 type Callback<T> = (val: T) => void;
 type Selecter<T> = () => T;
-type CommonObject = Record<string | symbol | number, unknown>;
+type CommonObject = object;
+export type CommonValues = string | number | bigint | undefined | null;
+export type CommonObjects =
+  | object
+  | unknown[]
+  | Set<unknown>
+  | Map<unknown, unknown>
+  | WeakSet<object>
+  | WeakMap<object, unknown>;
 
-interface Observable<T> {
+export type RedacTypes = Function | CommonObjects | CommonValues;
+export type RedacResult<T> = T extends Function
+  ? RedacFunc<T>
+  : T extends CommonObjects
+  ? RedacObject<T>
+  : T extends CommonValues
+  ? RedacValue<T>
+  : Observable<T>;
+
+export interface Observable<T> {
   [SUB](fn: (val: T) => void): () => void;
   [TRIGGER](): void;
+  [CLONE](): Observable<T>;
   get [TYPE](): "ref" | "object" | "getter";
+  get [ORIGINAL](): T;
 }
 
 interface RedacValue<T> extends Observable<T> {
   get current(): T;
-  [TRIGGER](): void;
 }
 
-type RedacObject<
-  T extends
-    | CommonObject
-    | Ref<unknown>
-    | unknown[]
-    | Set<unknown>
-    | Map<unknown, unknown>
-    | WeakSet<object>
-    | WeakMap<object, unknown>
-> = T & T extends Ref<infer P> ? Observable<P> : Observable<T>;
+export type RedacObject<T extends CommonObjects> = T &
+  (T extends Ref<infer P> ? Observable<P> : Observable<T>);
 
-type RedacFunc<T extends Function> = T & Observable<ReturnType<T>>;
-type RedacAsyncFunc<T, P extends AsyncFunction<T>> = P & Observable<T>;
+export type RedacFunc<T extends Function> = T & Observable<ReturnType<T>>;
+export type RedacAsyncFunc<T, P extends AsyncFunction<T>> = P & Observable<T>;
 
 interface Ref<T> {
   current: T;
@@ -58,12 +69,19 @@ function redacGetter<T>(getter: Getter<T>): RedacValue<T> {
     [TRIGGER]() {
       listeners.forEach((fn) => fn(getter()));
     },
+    [CLONE]() {
+      return redacGetter(getter);
+    },
     get [TYPE]() {
       return "getter" as const;
+    },
+    get [ORIGINAL]() {
+      return getter();
     },
   };
 }
 
+/** Not used */
 export function proxy<T>(r: Observable<T>, fn: Function) {
   if (typeof fn === "function") {
     return new Proxy(fn, {
@@ -76,6 +94,7 @@ export function proxy<T>(r: Observable<T>, fn: Function) {
   return fn;
 }
 
+/** Not used */
 export function spy<T extends Function>(fn: T, cb: Callback<void>) {
   if (typeof fn === "function") {
     return new Proxy(fn, {
@@ -95,7 +114,7 @@ export function collect<T extends Observable<unknown>[]>(...rvals: T) {
   const sub = () => {
     [...listeners.entries()].forEach(([fn, sub]) => {
       const val = sub.selector();
-      if (!equal(val, sub.current)) {
+      if (!_equal(val, sub.current)) {
         sub.current = val;
         fn(val);
       }
@@ -134,27 +153,16 @@ export function collect<T extends Observable<unknown>[]>(...rvals: T) {
   };
 }
 
-export function redac<T extends Function>(val: T): RedacFunc<T>;
-export function redac<
-  T extends
-    | CommonObject
-    | unknown[]
-    | Set<unknown>
-    | Map<unknown, unknown>
-    | WeakSet<object>
-    | WeakMap<object, unknown>
->(val: T): RedacObject<T>;
-export function redac<T>(val: T): RedacObject<Ref<T>>;
-export function redac<T extends unknown>(val: T): T;
-export function redac<T>(obj: T) {
+export function redac<T>(val: T): RedacResult<T>;
+export function redac(obj: unknown) {
   if (isValueType(obj)) {
-    return redacValue(obj);
+    return redacValue(obj) as Observable<unknown>;
   }
   if (typeof obj === "object") {
-    return redacObject(obj as CommonObject);
+    return redacObject(obj as unknown as CommonObject) as Observable<unknown>;
   }
   if (isFunc(obj)) {
-    return redacFunc(obj);
+    return redacFunc(obj) as Observable<unknown>;
   }
 }
 
@@ -169,7 +177,9 @@ function redacObject<T extends CommonObject>(
   const listeners = new Set<Callback<T>>();
   const trigger = (val = obj) =>
     listeners.forEach((fn) =>
-      fn((val[TYPE] === "ref" ? val.current : val) as T)
+      fn(
+        (Reflect.get(val, TYPE) === "ref" ? (val as Ref<T>).current : val) as T
+      )
     );
   return new Proxy(obj, {
     get(target, p) {
@@ -183,6 +193,12 @@ function redacObject<T extends CommonObject>(
         return () => {
           trigger(target);
         };
+      }
+      if (p === CLONE) {
+        return () => redacObject(_clone(obj), keys);
+      }
+      if (p === ORIGINAL) {
+        return obj;
       }
       if (target instanceof Set) {
         if (p === "add" || p === "delete" || p === "clear") {
@@ -232,9 +248,7 @@ function redacObject<T extends CommonObject>(
   }) as unknown as RedacObject<T>;
 }
 
-function redacValue<T extends string | number | bigint | undefined | null>(
-  val: T
-) {
+function redacValue<T extends CommonValues>(val: T) {
   const obj = {
     current: val,
     [TYPE]: "ref",
@@ -255,6 +269,12 @@ function redacFunc<T extends Function>(val: T) {
       }
       if (p === TRIGGER) {
         return trigger;
+      }
+      if (p === CLONE) {
+        return () => redacFunc(val);
+      }
+      if (p === ORIGINAL) {
+        return val;
       }
       return getProp(target, p);
     },
@@ -280,6 +300,12 @@ function redacAsyncFunc<T extends AsyncFunction>(val: T) {
       if (p === TRIGGER) {
         return trigger;
       }
+      if (p === CLONE) {
+        return () => redacAsyncFunc(val);
+      }
+      if (p === ORIGINAL) {
+        return val;
+      }
       return getProp(target, p);
     },
     apply: (target, thisArg, args) => {
@@ -290,8 +316,14 @@ function redacAsyncFunc<T extends AsyncFunction>(val: T) {
   }) as RedacFunc<T>;
 }
 
-// function redacFunc<T extends Function>() {}
-
 export function watch<T>(r: Observable<T>, fn: Callback<T>) {
   return r[SUB](fn);
+}
+
+export function clone<T extends Observable<unknown>>(r: T) {
+  return r[CLONE]() as T;
+}
+
+export function equal(a: Observable<unknown>, b: Observable<unknown>) {
+  return _equal(a[ORIGINAL], b[ORIGINAL]);
 }

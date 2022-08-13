@@ -14,7 +14,7 @@
         "ver:major": "deno run -A scripts/version.ts major",
         "ver:minor": "deno run -A scripts/version.ts minor",
         "ver:patch": "deno run -A scripts/version.ts patch",
-        "ver:aplha": "deno run -A scripts/version.ts pre aplha",
+        "ver:alpha": "deno run -A scripts/version.ts pre aplha",
         "ver:beta": "deno run -A scripts/version.ts pre beta"
     },
     "importMap": "import_map.json"

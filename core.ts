@@ -2,7 +2,7 @@
 import { equal as _equal } from "./equal.ts";
 import { getProp } from "./helper.ts";
 import { Subscription } from "./subscription.ts";
-import { CLONE, SUB, TRIGGER, TYPE, ORIGINAL } from "./symbol.ts";
+import { CLONE, SUB, TRIGGER, TYPE, ORIGINAL, VALUE } from "./symbol.ts";
 import { isValueType, type Function, isFunc, AsyncFunction } from "./type.ts";
 import { clone as _clone } from "./clone.ts";
 
@@ -10,6 +10,7 @@ type Getter<T> = () => T;
 type Callback<T> = (val: T) => void;
 type Selecter<T> = () => T;
 type CommonObject = object;
+type Mapper<T, P> = (from: T) => P;
 export type CommonValues = string | number | bigint | undefined | null;
 export type CommonObjects =
   | object
@@ -33,7 +34,8 @@ export interface Observable<T> {
   [TRIGGER](): void;
   [CLONE](): Observable<T>;
   get [TYPE](): "ref" | "object" | "getter";
-  get [ORIGINAL](): T;
+  get [ORIGINAL](): unknown;
+  get [VALUE](): T;
 }
 
 interface RedacValue<T> extends Observable<T> {
@@ -76,80 +78,11 @@ function redacGetter<T>(getter: Getter<T>): RedacValue<T> {
       return "getter" as const;
     },
     get [ORIGINAL]() {
+      return getter;
+    },
+    get [VALUE]() {
       return getter();
     },
-  };
-}
-
-/** Not used */
-export function proxy<T>(r: Observable<T>, fn: Function) {
-  if (typeof fn === "function") {
-    return new Proxy(fn, {
-      apply: (target, thisArg, args) => {
-        r[TRIGGER]();
-        return Reflect.apply(target, thisArg, args);
-      },
-    });
-  }
-  return fn;
-}
-
-/** Not used */
-export function spy<T extends Function>(fn: T, cb: Callback<void>) {
-  if (typeof fn === "function") {
-    return new Proxy(fn, {
-      apply: (target, thisArg, args) => {
-        cb();
-        return Reflect.apply(target, thisArg, args);
-      },
-    });
-  }
-  return fn;
-}
-
-export function collect<T extends Observable<unknown>[]>(...rvals: T) {
-  const listeners = new Map<Callback<unknown>, Subscriber<unknown>>();
-  const subscriptions = new Subscription();
-
-  const sub = () => {
-    [...listeners.entries()].forEach(([fn, sub]) => {
-      const val = sub.selector();
-      if (!_equal(val, sub.current)) {
-        sub.current = val;
-        fn(val);
-      }
-    });
-  };
-
-  for (const r of rvals) {
-    subscriptions.add(r[SUB](sub));
-  }
-
-  const watch = <T>(selector: Selecter<T>, fn: Callback<T>) => {
-    listeners.set(fn as Callback<unknown>, {
-      current: selector(),
-      selector,
-    });
-
-    return listeners.delete(fn as Callback<unknown>);
-  };
-
-  const select = <T>(selector: Selecter<T>): RedacValue<T> => {
-    const val = redacGetter(selector);
-    watch(selector, () => {
-      val[TRIGGER]();
-    });
-    return val;
-  };
-
-  const cleanup = () => {
-    subscriptions.dispose();
-  };
-
-  return {
-    select,
-    watch,
-    cleanup,
   };
 }
 
@@ -198,6 +131,9 @@ function redacObject<T extends CommonObject>(
         return () => redacObject(_clone(obj), keys);
       }
       if (p === ORIGINAL) {
+        return obj;
+      }
+      if (p === VALUE) {
         return obj;
       }
       if (target instanceof Set) {
@@ -256,10 +192,14 @@ function redacValue<T extends CommonValues>(val: T) {
   return redacObject(obj);
 }
 
-function redacFunc<T extends Function>(val: T) {
+function redacFunc<T extends Function>(func: T) {
   const listeners = new Set<Callback<unknown>>();
-  const trigger = (val?: unknown) => listeners.forEach((fn) => fn(val));
-  return new Proxy(val, {
+  let value: ReturnType<T> | null = null;
+  const trigger = (val?: unknown) => {
+    value = val as ReturnType<T>;
+    listeners.forEach((fn) => fn(val));
+  };
+  return new Proxy(func, {
     get(target, p) {
       if (p === SUB) {
         return (fn: Callback<unknown>) => {
@@ -271,10 +211,13 @@ function redacFunc<T extends Function>(val: T) {
         return trigger;
       }
       if (p === CLONE) {
-        return () => redacFunc(val);
+        return () => redacFunc(func);
       }
       if (p === ORIGINAL) {
-        return val;
+        return func;
+      }
+      if (p === VALUE) {
+        return value;
       }
       return getProp(target, p);
     },
@@ -286,10 +229,14 @@ function redacFunc<T extends Function>(val: T) {
   }) as RedacFunc<T>;
 }
 
-function redacAsyncFunc<T extends AsyncFunction>(val: T) {
+function redacAsyncFunc<T extends AsyncFunction>(func: T) {
   const listeners = new Set<Callback<unknown>>();
-  const trigger = (val?: unknown) => listeners.forEach((fn) => fn(val));
-  return new Proxy(val, {
+  let value: ReturnType<T> | null = null;
+  const trigger = (val?: unknown) => {
+    value = val as ReturnType<T>;
+    listeners.forEach((fn) => fn(val));
+  };
+  return new Proxy(func, {
     get(target, p) {
       if (p === SUB) {
         return (fn: Callback<unknown>) => {
@@ -301,10 +248,13 @@ function redacAsyncFunc<T extends AsyncFunction>(val: T) {
         return trigger;
       }
       if (p === CLONE) {
-        return () => redacAsyncFunc(val);
+        return () => redacAsyncFunc(func);
       }
       if (p === ORIGINAL) {
-        return val;
+        return func;
+      }
+      if (p === VALUE) {
+        return value;
       }
       return getProp(target, p);
     },
@@ -316,6 +266,87 @@ function redacAsyncFunc<T extends AsyncFunction>(val: T) {
   }) as RedacFunc<T>;
 }
 
+/** Not used */
+export function proxy<T>(r: Observable<T>, fn: Function) {
+  if (typeof fn === "function") {
+    return new Proxy(fn, {
+      apply: (target, thisArg, args) => {
+        r[TRIGGER]();
+        return Reflect.apply(target, thisArg, args);
+      },
+    });
+  }
+  return fn;
+}
+
+/** Not used */
+export function spy<T extends Function>(fn: T, cb: Callback<void>) {
+  if (typeof fn === "function") {
+    return new Proxy(fn, {
+      apply: (target, thisArg, args) => {
+        cb();
+        return Reflect.apply(target, thisArg, args);
+      },
+    });
+  }
+  return fn;
+}
+
+export function collect<T extends Observable<unknown>[]>(...rvals: T) {
+  const listeners = new Map<Callback<unknown>, Subscriber<unknown>>();
+  const subscriptions = new Subscription();
+
+  const sub = () => {
+    [...listeners.entries()].forEach(([fn, sub]) => {
+      const val = sub.selector();
+      if (!_equal(val, sub.current)) {
+        sub.current = val;
+        fn(val);
+      }
+    });
+  };
+
+  for (const r of rvals) {
+    subscriptions.add(r[SUB](sub));
+  }
+
+  const watch = <T>(selector: Selecter<T>, fn: Callback<T>) => {
+    listeners.set(fn as Callback<unknown>, {
+      current: selector(),
+      selector,
+    });
+
+    return () => {
+      listeners.delete(fn as Callback<unknown>);
+    };
+  };
+
+  const select = <T>(selector: Selecter<T>): RedacValue<T> => {
+    const val = redacGetter(selector);
+    subscriptions.add(
+      watch(selector, () => {
+        val[TRIGGER]();
+      })
+    );
+    return val;
+  };
+
+  const disposeSelect = (selector: RedacValue<T>) => {
+    listeners.delete(selector[ORIGINAL] as Function);
+  };
+
+  const cleanup = () => {
+    subscriptions.dispose();
+  };
+
+  return {
+    select,
+    watch,
+    cleanup,
+    disposeSelect,
+  };
+}
+
 export function watch<T>(r: Observable<T>, fn: Callback<T>) {
   return r[SUB](fn);
 }
@@ -325,5 +356,13 @@ export function clone<T extends Observable<unknown>>(r: T) {
 }
 
 export function equal(a: Observable<unknown>, b: Observable<unknown>) {
-  return _equal(a[ORIGINAL], b[ORIGINAL]);
+  return _equal(a[VALUE], b[VALUE]);
+}
+
+export function select<T, P>(
+  r: Observable<T>,
+  mapper: Mapper<T, P>
+): RedacObject<Ref<P>> {
+  const { select } = collect(r);
+  return select(() => mapper(r[VALUE]));
 }

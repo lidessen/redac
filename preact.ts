@@ -1,11 +1,37 @@
-import { useMemo, useCallback, useState, useEffect } from "preact/hooks";
 import {
-  CommonObjects,
-  CommonValues,
+  watch,
+  Observable,
   RedacResult,
   redac,
-  watch,
+  CommonObjects,
+  CommonValues,
+  select,
 } from "./core.ts";
+import { TYPE, VALUE } from "./symbol.ts";
+import {
+  useCallback,
+  useMemo,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+} from "preact/compat";
+import { clone } from "./clone.ts";
+
+export function useRedac<T>(r: Observable<T>): T;
+export function useRedac<T, P>(r: Observable<T>, selector: (state: T) => P): P;
+export function useRedac<T, P>(r: Observable<T>, selector?: (state: T) => P) {
+  const subscribe = (fn: () => void) => {
+    return watch<T | P>(selector ? select(r, selector) : r, fn);
+  };
+  const snapshot = () => {
+    return (
+      r[TYPE] === "ref" || r[TYPE] === "getter"
+        ? Reflect.get(r, "current", r)
+        : clone(Reflect.get(r, VALUE))
+    ) as T;
+  };
+  return useSyncExternalStore(subscribe, snapshot);
+}
 
 export function useRedacState<T extends CommonObjects | CommonValues>(
   data: T

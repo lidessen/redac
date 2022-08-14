@@ -5,32 +5,32 @@ import {
   redac,
   CommonObjects,
   CommonValues,
+  select,
 } from "./core.ts";
-import { CLONE, TYPE } from "./symbol.ts";
-import { useSyncExternalStoreWithSelector } from "use-sync-external-store/shim/with-selector";
-import { useCallback, useMemo } from "react";
-import { equal } from "./equal.ts";
+import { TYPE, VALUE } from "./symbol.ts";
+import {
+  useCallback,
+  useMemo,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { clone } from "./clone.ts";
 
 export function useRedac<T>(r: Observable<T>): T;
 export function useRedac<T, P>(r: Observable<T>, selector: (state: T) => P): P;
-export function useRedac<T>(r: Observable<T>, selector = (x: T) => x) {
+export function useRedac<T, P>(r: Observable<T>, selector?: (state: T) => P) {
   const subscribe = (fn: () => void) => {
-    return watch(r, fn);
+    return watch<T | P>(selector ? select(r, selector) : r, fn);
   };
   const snapshot = () => {
     return (
       r[TYPE] === "ref" || r[TYPE] === "getter"
         ? Reflect.get(r, "current", r)
-        : r
+        : clone(Reflect.get(r, VALUE))
     ) as T;
   };
-  return useSyncExternalStoreWithSelector(
-    subscribe,
-    snapshot,
-    snapshot,
-    selector || snapshot,
-    equal
-  );
+  return useSyncExternalStore(subscribe, snapshot, snapshot);
 }
 
 export function useRedacState<T extends CommonObjects | CommonValues>(
@@ -45,15 +45,15 @@ export function useRedacState<T extends CommonObjects | CommonValues>(
     [r]
   );
 
-  const snapshot = useCallback(() => {
-    return r[CLONE]() as RedacResult<T>;
-  }, [r]);
+  const [{ _instance }, forceUpdate] = useState({
+    _instance: r,
+  });
 
-  return useSyncExternalStoreWithSelector(
-    subscribe,
-    snapshot,
-    snapshot,
-    snapshot,
-    equal
-  );
+  useEffect(() => {
+    return subscribe(() => {
+      forceUpdate({ _instance: r });
+    });
+  }, [subscribe]);
+
+  return _instance as RedacResult<T>;
 }

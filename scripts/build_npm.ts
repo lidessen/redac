@@ -27,17 +27,6 @@ await build({
     bugs: {
       url: "https://github.com/ztytotoro/redac/issues",
     },
-    devDependencies: {
-      "@types/use-sync-external-store": "^0.0.3",
-    },
-  },
-  mappings: {
-    "https://esm.sh/use-sync-external-store@1.2.0/shim/with-selector": {
-      name: "use-sync-external-store",
-      version: "^1.2.0",
-      subPath: "shim/with-selector",
-      peerDependency: true,
-    },
   },
 });
 

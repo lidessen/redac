@@ -1,10 +1,20 @@
-import { redac, clone, equal } from "./core.ts";
+import { redac, clone, equal, watch } from "./core.ts";
+import { interval } from "./iter.ts";
 
-const a = redac({ a: 123 });
+const a = redac({
+  count: 123,
+  add() {
+    this.count++;
+  },
+});
 const b = clone(a);
 
 console.log(a === b);
-b.a = 456;
+b.count = 456;
 
 console.log(a, b);
 console.log(equal(a, b));
+
+watch(a, console.log);
+
+interval(1000).subscribe(a.add);

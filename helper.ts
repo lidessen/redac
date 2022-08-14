@@ -6,8 +6,13 @@ export function bind<T, V>(target: T, v: V) {
     : v;
 }
 
-// deno-lint-ignore ban-types
-export function getProp(target: object, p: PropertyKey) {
-  const v = Reflect.get(target, p, target);
-  return bind(target, v);
+export function getProp(
+  // deno-lint-ignore ban-types
+  target: object,
+  p: PropertyKey,
+  // deno-lint-ignore ban-types
+  _bind: object = target
+) {
+  const v = Reflect.get(target, p, _bind);
+  return bind(_bind, v);
 }

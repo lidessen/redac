@@ -114,7 +114,7 @@ function redacObject<T extends CommonObject>(
         (Reflect.get(val, TYPE) === "ref" ? (val as Ref<T>).current : val) as T
       )
     );
-  return new Proxy(obj, {
+  const proxy = new Proxy(obj, {
     get(target, p) {
       if (p === SUB) {
         return (fn: Callback<T>) => {
@@ -172,7 +172,7 @@ function redacObject<T extends CommonObject>(
           };
         }
       }
-      return getProp(target, p);
+      return getProp(target, p, proxy);
     },
     set(target, p, value) {
       target[p as keyof typeof target] = value;
@@ -182,6 +182,8 @@ function redacObject<T extends CommonObject>(
       return true;
     },
   }) as unknown as RedacObject<T>;
+
+  return proxy;
 }
 
 function redacValue<T extends CommonValues>(val: T) {

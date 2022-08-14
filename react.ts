@@ -8,6 +8,7 @@ import {
 } from "./core.ts";
 import { CLONE, TYPE } from "./symbol.ts";
 import { useSyncExternalStoreWithSelector } from "use-sync-external-store/shim/with-selector";
+import { useCallback, useMemo } from "react";
 import { equal } from "./equal.ts";
 
 export function useRedac<T>(r: Observable<T>): T;
@@ -35,14 +36,18 @@ export function useRedac<T>(r: Observable<T>, selector = (x: T) => x) {
 export function useRedacState<T extends CommonObjects | CommonValues>(
   data: T
 ): RedacResult<T> {
-  const r = redac<unknown>(data);
+  const r = useMemo(() => redac<unknown>(data), []);
 
-  const subscribe = (fn: () => void) => {
-    return watch(r, fn);
-  };
-  const snapshot = () => {
+  const subscribe = useCallback(
+    (fn: () => void) => {
+      return watch(r, fn);
+    },
+    [r]
+  );
+
+  const snapshot = useCallback(() => {
     return r[CLONE]() as RedacResult<T>;
-  };
+  }, [r]);
 
   return useSyncExternalStoreWithSelector(
     subscribe,

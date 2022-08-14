@@ -4,7 +4,7 @@ import { VERSION } from "../version.ts";
 await emptyDir("./npm");
 
 await build({
-  entryPoints: ["./mod.ts"],
+  entryPoints: ["./mod.ts", "./react.ts", "./preact.ts"],
   outDir: "./npm",
   shims: {
     deno: true,
@@ -26,6 +26,9 @@ await build({
     },
     bugs: {
       url: "https://github.com/ztytotoro/redac/issues",
+    },
+    devDependencies: {
+      "@types/react": "^18.0.17",
     },
   },
 });

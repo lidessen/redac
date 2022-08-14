@@ -4,10 +4,10 @@
     "semver/": "https://deno.land/std@0.152.0/semver/",
     "testing/": "https://deno.land/std@0.152.0/testing/",
     "dnt/": "https://deno.land/x/dnt@0.30.0/",
-    "preact": "https://esm.sh/v91/preact@10.10.2",
-    "preact/": "https://esm.sh/v91/preact@10.10.2/",
-    "react": "https://esm.sh/v91/*react@18.2.0",
-    "react/": "https://esm.sh/v91/*react@18.2.0/"
+    "preact": "https://esm.sh/preact@10.10.2",
+    "preact/": "https://esm.sh/preact@10.10.2/",
+    "react": "https://esm.sh/react@18.2.0",
+    "react/": "https://esm.sh/react@18.2.0/"
   },
   "scopes": {
     "react": {
